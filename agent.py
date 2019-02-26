@@ -23,7 +23,7 @@ class User():
 		self.action_size = action_size
 
 	def act(self, state, tau):
-		action = input('Enter your chosen action: ')
+		action = int(input('Enter your chosen action: '))
 		pi = np.zeros(self.action_size)
 		pi[action] = 1
 		value = None
@@ -105,6 +105,7 @@ class Agent():
 
 	def get_preds(self, state):
 		#predict the leaf
+		
 		inputToModel = np.array([self.model.convertToModelInput(state)])
 
 		preds = self.model.predict(inputToModel)

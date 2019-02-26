@@ -1,22 +1,89 @@
 import numpy as np
+import copy
 import logging
+import random
+
+MAX_HEALTH = 5
+SIZE_FOOD_LAYER = 1
+games_explored = 0
+longest_snake = 0
+
+def xyToBoard(xy, w, h, layer):
+	return xy[0] + xy[1] * h + w * h * layer
+
+
+def gen_random_unoccupied_spaces_size_n(n, x, y, occ):
+	starting_pos = []
+	for i in range(n):
+		while True:
+			pos = (random.randint(0,x - 1), random.randint(0,y - 1))
+			if pos not in starting_pos and pos not in occ:
+				starting_pos.append(pos)
+				break
+	return starting_pos
 
 class Game:
 
-	def __init__(self):		
-		self.currentPlayer = 1
-		self.gameState = GameState(np.array([0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0], dtype=np.int), 1)
-		self.actionSpace = np.array([0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0], dtype=np.int)
+	def __init__(self, grid_shape=(4,4), num_players=2):
+
+		self.currentPlayer = 0
+		
+		self.grid_shape = grid_shape
+		self.w = grid_shape[0]
+		self.h = grid_shape[1]
+		self.num_players = num_players
 		self.pieces = {'1':'X', '0': '-', '-1':'O'}
-		self.grid_shape = (6,7)
-		self.input_shape = (2,6,7)
-		self.name = 'connect4'
+
+		self.actionSpace = np.array([0,0,0,0], dtype=np.int)
+
+		# TODO: Set number of food to start with
+		init_num_food = self.w
+
+		self.food_layer = self.num_players + SIZE_FOOD_LAYER - 1 # 0 indexing
+		self.player_layer = 0
+
+		self.num_layers = self.num_players + SIZE_FOOD_LAYER
+		self.input_shape = (self.num_layers, self.w, self.h)
+
+		self.name = 'snek'
+
+
+		# Generate snake starting positions
+		starting_pos = gen_random_unoccupied_spaces_size_n(self.num_players, self.w, self.h, [])
+
+		# Assign starting positions to snakes
+		self.snakes = [[p] for p in [(1,3),(3,1)]]# starting_pos]
+		self.board = np.array( [0] * self.grid_shape[0] * self.grid_shape[1] * self.num_layers, dtype=np.int)
+
+		# Draw snakes on board
+		for i, snake in enumerate(self.snakes):
+			for xy in snake:
+				self.board[xy[0] + xy[1] * self.h + self.w * self.h * i] = 1
+
+
+		# Generate food starting positions
+		starting_food = gen_random_unoccupied_spaces_size_n(init_num_food, self.w, self.h, starting_pos)
+
+		# Draw snakes on board
+		for xy in starting_food:
+			self.board[xy[0] + xy[1] * self.h + self.w * self.h * self.food_layer] = 1
+
+		# Set Initial food
+		self.turnNumber = [0] * self.num_players
+		self.health = [MAX_HEALTH] * self.num_players
+
+
+		self.gameState = GameState(self.board, self.grid_shape, self.snakes, 0, self.turnNumber, self.health)
+
 		self.state_size = len(self.gameState.binary)
 		self.action_size = len(self.actionSpace)
 
+
+
 	def reset(self):
-		self.gameState = GameState(np.array([0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0], dtype=np.int), 1)
-		self.currentPlayer = 1
+		self.gameState = GameState(self.board, self.grid_shape, self.snakes, 0, self.turnNumber, self.health)
+		
+		self.currentPlayer = 0
 		return self.gameState
 
 	def step(self, action):
@@ -29,111 +96,59 @@ class Game:
 	def identities(self, state, actionValues):
 		identities = [(state,actionValues)]
 
+		# TODO, should be 8 identities. Flip (x2), rotate (x4)
 		currentBoard = state.board
 		currentAV = actionValues
-
-		currentBoard = np.array([
-			  currentBoard[6], currentBoard[5],currentBoard[4], currentBoard[3], currentBoard[2], currentBoard[1], currentBoard[0]
-			, currentBoard[13], currentBoard[12],currentBoard[11], currentBoard[10], currentBoard[9], currentBoard[8], currentBoard[7]
-			, currentBoard[20], currentBoard[19],currentBoard[18], currentBoard[17], currentBoard[16], currentBoard[15], currentBoard[14]
-			, currentBoard[27], currentBoard[26],currentBoard[25], currentBoard[24], currentBoard[23], currentBoard[22], currentBoard[21]
-			, currentBoard[34], currentBoard[33],currentBoard[32], currentBoard[31], currentBoard[30], currentBoard[29], currentBoard[28]
-			, currentBoard[41], currentBoard[40],currentBoard[39], currentBoard[38], currentBoard[37], currentBoard[36], currentBoard[35]
-			])
-
-		currentAV = np.array([
-			currentAV[6], currentAV[5],currentAV[4], currentAV[3], currentAV[2], currentAV[1], currentAV[0]
-			, currentAV[13], currentAV[12],currentAV[11], currentAV[10], currentAV[9], currentAV[8], currentAV[7]
-			, currentAV[20], currentAV[19],currentAV[18], currentAV[17], currentAV[16], currentAV[15], currentAV[14]
-			, currentAV[27], currentAV[26],currentAV[25], currentAV[24], currentAV[23], currentAV[22], currentAV[21]
-			, currentAV[34], currentAV[33],currentAV[32], currentAV[31], currentAV[30], currentAV[29], currentAV[28]
-			, currentAV[41], currentAV[40],currentAV[39], currentAV[38], currentAV[37], currentAV[36], currentAV[35]
-					])
-
-		identities.append((GameState(currentBoard, state.playerTurn), currentAV))
 
 		return identities
 
 
-class GameState():
-	def __init__(self, board, playerTurn):
+class GameState(): # TODO: Condense inputs
+	def __init__(self, board, grid_shape, snakes, playerTurn, turnNumber, health):
 		self.board = board
+		self.snakes = snakes
+		self.num_players = len(snakes)
+		self.num_snakes = len(snakes)
+		self.grid_shape = grid_shape
+		self.w = grid_shape[0]
+		self.h = grid_shape[1]
+		self.turnNumber = turnNumber
+
+		"""
+		global games_explored
+		games_explored += 1
+		if games_explored % 100 == 0:
+			print("games_explored = %s" % games_explored, end="\r")
+
+
+		global longest_snake
+		if len(snakes[0]) > longest_snake:
+			longest_snake += 1
+			print("longest_snake = %s" % longest_snake, end="")
+		"""
+
+		self.health = health
+
+
+		# Docs - More const section
+		self.food_layer = self.num_players + SIZE_FOOD_LAYER - 1 # 0 indexing
 		self.pieces = {'1':'X', '0': '-', '-1':'O'}
-		self.winners = [
-			[0,1,2,3],
-			[1,2,3,4],
-			[2,3,4,5],
-			[3,4,5,6],
-			[7,8,9,10],
-			[8,9,10,11],
-			[9,10,11,12],
-			[10,11,12,13],
-			[14,15,16,17],
-			[15,16,17,18],
-			[16,17,18,19],
-			[17,18,19,20],
-			[21,22,23,24],
-			[22,23,24,25],
-			[23,24,25,26],
-			[24,25,26,27],
-			[28,29,30,31],
-			[29,30,31,32],
-			[30,31,32,33],
-			[31,32,33,34],
-			[35,36,37,38],
-			[36,37,38,39],
-			[37,38,39,40],
-			[38,39,40,41],
 
-			[0,7,14,21],
-			[7,14,21,28],
-			[14,21,28,35],
-			[1,8,15,22],
-			[8,15,22,29],
-			[15,22,29,36],
-			[2,9,16,23],
-			[9,16,23,30],
-			[16,23,30,37],
-			[3,10,17,24],
-			[10,17,24,31],
-			[17,24,31,38],
-			[4,11,18,25],
-			[11,18,25,32],
-			[18,25,32,39],
-			[5,12,19,26],
-			[12,19,26,33],
-			[19,26,33,40],
-			[6,13,20,27],
-			[13,20,27,34],
-			[20,27,34,41],
+		self.direction_map_x = {
+			'up' : 0, 'down' : 0, 'left' : -1,'right' : 1
+		}
 
-			[3,9,15,21],
-			[4,10,16,22],
-			[10,16,22,28],
-			[5,11,17,23],
-			[11,17,23,29],
-			[17,23,29,35],
-			[6,12,18,24],
-			[12,18,24,30],
-			[18,24,30,36],
-			[13,19,25,31],
-			[19,25,31,37],
-			[20,26,32,38],
+		self.direction_map_y = {
+			'up' : -1, 'down' : 1, 'left' : 0, 'right' : 0
+		}
 
-			[3,11,19,27],
-			[2,10,18,26],
-			[10,18,26,34],
-			[1,9,17,25],
-			[9,17,25,33],
-			[17,25,33,41],
-			[0,8,16,24],
-			[8,16,24,32],
-			[16,24,32,40],
-			[7,15,23,31],
-			[15,23,31,39],
-			[14,22,30,38],
-			]
-		self.playerTurn = playerTurn
+		self.possibleActions = ['up','down','left','right']
+
+
+		# Eval Section
+		self.winners = []
+		self.playerTurnInternal = playerTurn
+		self.playerTurn = 1 if playerTurn == 0 else -1
 		self.binary = self._binary()
 		self.id = self._convertStateToId()
 		self.allowedActions = self._allowedActions()
@@ -141,74 +156,161 @@ class GameState():
 		self.value = self._getValue()
 		self.score = self._getScore()
 
+		if (self.playerTurnInternal == 0 and
+			 turnNumber[self.playerTurnInternal] % 10 == 0):
+				# Add food
+				new_food = gen_random_unoccupied_spaces_size_n(1, self.w, self.h, [])[0]
+				self.board[xyToBoard(new_food, self.w, self.h, self.food_layer)] = 1
+
+
+	def _get_current_location(self):
+		return self.snakes[self.playerTurnInternal][0]
+
+
+	def _in_board(self, xy):
+		
+		BOARD_HEIGHT = self.h
+		BOARD_WIDTH = self.w
+		if xy[0] >= BOARD_WIDTH or xy[0] < 0:
+				return False
+		elif xy[1] >= BOARD_HEIGHT or xy[1] < 0:
+				return False
+			 
+		return True
+
+	def _get_action_xy(self, action):
+
+		xy = self._get_current_location()
+		next_xy = (xy[0] + self.direction_map_x[action],
+							 xy[1] + self.direction_map_y[action])
+
+		return next_xy
+
+	def _is_valid_action(self, action):
+
+		current_xy = self._get_current_location()
+		
+		# Check if the action moves you off the board
+		new_xy = self._get_action_xy(action)
+
+		if not self._in_board(new_xy):
+			return False
+
+		# Check if you will hit another snake
+		snake_bodies = []
+
+		snakes = self.snakes
+
+		snakes_bodies = ( snake_xy for snake in snakes for snake_xy in snake )
+
+		# TODO : Remove tails of snakes longer than 3
+		# TODO : Remove heads of already moved snakes which are smaller
+		# TODO : Add heads of not yet moved snakes which are equal/larger
+
+		if new_xy in snakes_bodies:
+			# print('Theres a snake in this boot')
+			return False
+
+
+		return True
+
 	def _allowedActions(self):
 		allowed = []
-		for i in range(len(self.board)):
-			if i >= len(self.board) - 7:
-				if self.board[i]==0:
-					allowed.append(i)
-			else:
-				if self.board[i] == 0 and self.board[i+7] != 0:
-					allowed.append(i)
 
+		for i, action in enumerate(self.possibleActions):
+			if self._is_valid_action(action):
+				allowed.append(i)
+				
 		return allowed
 
 	def _binary(self):
 
-		currentplayer_position = np.zeros(len(self.board), dtype=np.int)
-		currentplayer_position[self.board==self.playerTurn] = 1
-
-		other_position = np.zeros(len(self.board), dtype=np.int)
-		other_position[self.board==-self.playerTurn] = 1
-
-		position = np.append(currentplayer_position,other_position)
-
-		return (position)
+		return (self.board)
 
 	def _convertStateToId(self):
-		player1_position = np.zeros(len(self.board), dtype=np.int)
-		player1_position[self.board==1] = 1
 
-		other_position = np.zeros(len(self.board), dtype=np.int)
-		other_position[self.board==-1] = 1
-
-		position = np.append(player1_position,other_position)
-
-		id = ''.join(map(str,position))
+		id = ''.join(map(str,self.board))
 
 		return id
 
 	def _checkForEndGame(self):
-		if np.count_nonzero(self.board) == 42:
+		if not self.allowedActions:
 			return 1
 
-		for x,y,z,a in self.winners:
-			if (self.board[x] + self.board[y] + self.board[z] + self.board[a] == 4 * -self.playerTurn):
-				return 1
+		if self.health[self.playerTurnInternal] <= 0:
+			return 1
+
 		return 0
 
 
 	def _getValue(self):
 		# This is the value of the state for the current player
-		# i.e. if the previous player played a winning move, you lose
-		for x,y,z,a in self.winners:
-			if (self.board[x] + self.board[y] + self.board[z] + self.board[a] == 4 * -self.playerTurn):
-				return (-1, -1, 1)
-		return (0, 0, 0)
+		# i.e. if you have no more moves, you lose
+		if self.isEndGame:
+			return (-1,-1,-1)
+
+		v = 0 # len(self.snakes[self.playerTurnInternal])
+
+		return (v, v, v)
 
 
 	def _getScore(self):
 		tmp = self.value
 		return (tmp[1], tmp[2])
 
+	def _hasFood(self, xy):
+		return self._xyToBoard(xy, self.food_layer) == 1
 
+
+	def _xyToBoard(self, xy, layer):
+		return xyToBoard(xy, self.w, self.h, layer)
+
+	def _nextPlayer(self):
+		return (self.playerTurnInternal  + 1) % self.num_players
 
 
 	def takeAction(self, action):
+
+
+		print(self._get_current_location)
+		print(action)
+		new_xy = self._get_action_xy(self.possibleActions[action])
+
+		snake = copy.deepcopy(self.snakes[self.playerTurnInternal])
+
 		newBoard = np.array(self.board)
-		newBoard[action]=self.playerTurn
-		
-		newState = GameState(newBoard, -self.playerTurn)
+		print(new_xy)
+
+		hasFood = self._hasFood(new_xy)
+		newBoard[self._xyToBoard(new_xy, self.food_layer)] = 0
+
+		# Remove tail if at least 3 long
+		if len(snake) >= 3 and not hasFood:
+			newBoard[ self._xyToBoard(snake[-1], self.playerTurnInternal) ] = 0
+			snake = snake[:-1]
+
+		# Add head
+		newBoard[self._xyToBoard(new_xy, self.playerTurnInternal)] = 1
+		snake = [new_xy] + snake
+
+		snakes = copy.deepcopy(self.snakes)
+		snakes[self.playerTurnInternal] = snake
+
+
+		# Update Turn number
+		turnNumber = copy.deepcopy(self.turnNumber)
+		turnNumber[self.playerTurnInternal] += 1
+
+		# Update Health
+		health = copy.deepcopy(self.health)
+		health[self.playerTurnInternal] -= 1
+		if hasFood:
+			health[self.playerTurnInternal] = MAX_HEALTH
+
+
+
+
+		newState = GameState(newBoard, self.grid_shape, snakes, self._nextPlayer(), turnNumber, health)
 
 		value = 0
 		done = 0
@@ -217,12 +319,33 @@ class GameState():
 			value = newState.value[0]
 			done = 1
 
-		return (newState, value, done) 
+		return (newState, value, done)
 
 
 
 
 	def render(self, logger):
-		for r in range(6):
-			logger.info([self.pieces[str(x)] for x in self.board[7*r : (7*r + 7)]])
-		logger.info('--------------')
+
+		print()
+		snakes_bodies = [ snake_xy for snake in self.snakes for snake_xy in snake ]
+		print(snakes_bodies)
+		xys = ((x,y) for x in range(self.w) for y in range(self.h))
+		print(''.join(['-'] * self.w))
+		for x in range(self.w):
+			pieces = []
+			for y in range(self.h):
+				piece = ' '
+				if self._hasFood((x,y)):
+					piece = '#'
+				elif (x,y) in snakes_bodies:
+					piece = 'O'
+
+				pieces.append(piece)
+			print(''.join(pieces))
+		print(''.join(['-'] * self.w))
+
+		print(self.snakes)
+		print(self.turnNumber)
+		print(self.health)
+
+		print('--------------')
