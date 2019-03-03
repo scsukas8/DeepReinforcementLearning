@@ -1,0 +1,10 @@
+BOARD_KEY = "board"
+YOU_KEY = "you"
+SNAKES_KEY = "snakes"
+BODY_KEY = "body"
+FOOD_KEY = "food"
+HEIGHT_KEY = "height"
+WIDTH_KEY = "width"
+ID_KEY = 'id'
+TURN_KEY = 'turn'
+HEALTH_KEY = 'health'

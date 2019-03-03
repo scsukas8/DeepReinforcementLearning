@@ -3,16 +3,22 @@ import copy
 import logging
 import random
 
-MAX_HEALTH = 5
+MAX_HEALTH = 100
 SIZE_FOOD_LAYER = 1
+SIZE_OTHER_LAYER = 1
 games_explored = 0
 longest_snake = 0
+longest_game = 0
 
 def xyToBoard(xy, w, h, layer):
 	return xy[0] + xy[1] * h + w * h * layer
 
 
 def gen_random_unoccupied_spaces_size_n(n, x, y, occ):
+	# If theres not enough space, just return
+	if len(list(occ)) > x * y:
+		return []
+
 	starting_pos = []
 	for i in range(n):
 		while True:
@@ -22,11 +28,35 @@ def gen_random_unoccupied_spaces_size_n(n, x, y, occ):
 				break
 	return starting_pos
 
+def draw_on_board(board, snakes, food, turns, health):
+	# Draw snakes on board
+	for i, snake in enumerate(self.snakes):
+		for j, xy in enumerate(snake):
+			if j == 0: # Draw heads in the head layer
+				board[xyToBoard(xy, self.w, self.h, i * 2)] = 1
+			else: # Draw body in the body layer
+				board[xyToBoard(xy, self.w, self.h, i * 2 + 1)] = 1
+
+	# Draw food on board
+	for xy in starting_food:
+		board[xyToBoard(xy, self.w, self.h, self.food_layer)] = 1
+
+
+	# Add them to the board
+	for i, turn in enumerate(self.turnNumber):
+		xy = (i, 0)
+		board[xyToBoard(xy, self.w, self.h, self.other_layer)] = turn
+
+	for i, health in enumerate(self.health):
+		xy = (i, 1)
+		self.board[xyToBoard(xy, self.w, self.h, self.other_layer)] = health
+
+
 class Game:
 
-	def __init__(self, grid_shape=(4,4), num_players=2):
+	def __init__(self, grid_shape=(7,7), num_players=2, starting_pos = [], starting_food = []):
 
-		self.currentPlayer = 0
+		self.currentPlayer = 1
 		
 		self.grid_shape = grid_shape
 		self.w = grid_shape[0]
@@ -37,42 +67,38 @@ class Game:
 		self.actionSpace = np.array([0,0,0,0], dtype=np.int)
 
 		# TODO: Set number of food to start with
-		init_num_food = self.w
+		init_num_food = 1
 
-		self.food_layer = self.num_players + SIZE_FOOD_LAYER - 1 # 0 indexing
+		self.num_layers_player = self.num_players * 2
+		self.food_layer = self.num_layers_player + SIZE_FOOD_LAYER - 1 # 0 indexing
+		self.other_layer = self.food_layer + SIZE_OTHER_LAYER
 		self.player_layer = 0
 
-		self.num_layers = self.num_players + SIZE_FOOD_LAYER
+		self.num_layers = self.num_layers_player + SIZE_FOOD_LAYER + SIZE_OTHER_LAYER
 		self.input_shape = (self.num_layers, self.w, self.h)
 
 		self.name = 'snek'
 
 
 		# Generate snake starting positions
-		starting_pos = gen_random_unoccupied_spaces_size_n(self.num_players, self.w, self.h, [])
+		if not len(starting_pos) != num_players:
+			starting_pos = gen_random_unoccupied_spaces_size_n(self.num_players, self.w, self.h, [])
 
 		# Assign starting positions to snakes
-		self.snakes = [[p] for p in [(1,3),(3,1)]]# starting_pos]
+		self.snakes = [[p] for p in starting_pos] # [(1,3),(3,1)]]
 		self.board = np.array( [0] * self.grid_shape[0] * self.grid_shape[1] * self.num_layers, dtype=np.int)
 
-		# Draw snakes on board
-		for i, snake in enumerate(self.snakes):
-			for xy in snake:
-				self.board[xy[0] + xy[1] * self.h + self.w * self.h * i] = 1
-
-
 		# Generate food starting positions
-		starting_food = gen_random_unoccupied_spaces_size_n(init_num_food, self.w, self.h, starting_pos)
+		if not starting_food:
+			starting_food = gen_random_unoccupied_spaces_size_n(init_num_food, self.w, self.h, starting_pos)
 
-		# Draw snakes on board
-		for xy in starting_food:
-			self.board[xy[0] + xy[1] * self.h + self.w * self.h * self.food_layer] = 1
-
-		# Set Initial food
+		# Set health and turn number
 		self.turnNumber = [0] * self.num_players
 		self.health = [MAX_HEALTH] * self.num_players
 
 
+
+		print(self.snakes)
 		self.gameState = GameState(self.board, self.grid_shape, self.snakes, 0, self.turnNumber, self.health)
 
 		self.state_size = len(self.gameState.binary)
@@ -83,7 +109,7 @@ class Game:
 	def reset(self):
 		self.gameState = GameState(self.board, self.grid_shape, self.snakes, 0, self.turnNumber, self.health)
 		
-		self.currentPlayer = 0
+		self.currentPlayer = 1
 		return self.gameState
 
 	def step(self, action):
@@ -113,25 +139,24 @@ class GameState(): # TODO: Condense inputs
 		self.w = grid_shape[0]
 		self.h = grid_shape[1]
 		self.turnNumber = turnNumber
-
-		"""
-		global games_explored
-		games_explored += 1
-		if games_explored % 100 == 0:
-			print("games_explored = %s" % games_explored, end="\r")
-
-
-		global longest_snake
-		if len(snakes[0]) > longest_snake:
-			longest_snake += 1
-			print("longest_snake = %s" % longest_snake, end="")
-		"""
-
 		self.health = health
 
-
 		# Docs - More const section
-		self.food_layer = self.num_players + SIZE_FOOD_LAYER - 1 # 0 indexing
+		self.num_layers_player = 2 * self.num_players
+		self.food_layer = self.num_layers_player + SIZE_FOOD_LAYER - 1 # 0 indexing
+		self.other_layer = self.food_layer + SIZE_OTHER_LAYER
+
+		# Set Health and Turn on the board
+		for i, turn in enumerate(self.turnNumber):
+			xy = (i, 0)
+			self.board[xyToBoard(xy, self.w, self.h, self.other_layer)] = turn
+
+		for i, health in enumerate(self.health):
+			xy = (i, 1)
+			self.board[xyToBoard(xy, self.w, self.h, self.other_layer)] = health
+
+
+
 		self.pieces = {'1':'X', '0': '-', '-1':'O'}
 
 		self.direction_map_x = {
@@ -159,8 +184,31 @@ class GameState(): # TODO: Condense inputs
 		if (self.playerTurnInternal == 0 and
 			 turnNumber[self.playerTurnInternal] % 10 == 0):
 				# Add food
-				new_food = gen_random_unoccupied_spaces_size_n(1, self.w, self.h, [])[0]
+				snakes_bodies = ( snake_xy for snake in self.snakes for snake_xy in snake )
+				new_food = gen_random_unoccupied_spaces_size_n(1, self.w, self.h, snakes_bodies)[0]
 				self.board[xyToBoard(new_food, self.w, self.h, self.food_layer)] = 1
+
+		"""
+
+		global games_explored
+		games_explored += 1
+		if games_explored % 1000 == 0:
+			print("games_explored = %s" % games_explored)
+			self._print_render()
+		
+
+		global longest_snake
+		if len(snakes[0]) > longest_snake:
+			longest_snake += 1
+			print("longest_snake = %s" % longest_snake)
+		
+		global longest_game
+		if turnNumber[0] > longest_game:
+			longest_game = turnNumber[0]
+			print("longest_game = %s" % longest_game)
+
+		"""
+
 
 
 	def _get_current_location(self):
@@ -208,8 +256,9 @@ class GameState(): # TODO: Condense inputs
 		# TODO : Add heads of not yet moved snakes which are equal/larger
 
 		if new_xy in snakes_bodies:
+			pass
 			# print('Theres a snake in this boot')
-			return False
+			#return False
 
 
 		return True
@@ -234,13 +283,30 @@ class GameState(): # TODO: Condense inputs
 		return id
 
 	def _checkForEndGame(self):
-		if not self.allowedActions:
+		if len(self.allowedActions) == 0:
 			return 1
 
 		if self.health[self.playerTurnInternal] <= 0:
 			return 1
 
+
+		# Check if you will hit another snake
+		snake_bodies = []
+
+		snakes = self.snakes
+
+		snakes_bodies = snakes[self.playerTurnInternal][1:] \
+			 + [snake if i != self.playerTurnInternal else [] for i, snake in enumerate(self.snakes)]
+
+		if snakes[self.playerTurnInternal][0] in snakes_bodies:
+			return 1
+
 		return 0
+
+	def _generateNewFood(self):
+		snakes_bodies = ( snake_xy for snake in self.snakes for snake_xy in snake )
+
+
 
 
 	def _getValue(self):
@@ -259,7 +325,7 @@ class GameState(): # TODO: Condense inputs
 		return (tmp[1], tmp[2])
 
 	def _hasFood(self, xy):
-		return self._xyToBoard(xy, self.food_layer) == 1
+		return self.board[self._xyToBoard(xy, self.food_layer)] == 1
 
 
 	def _xyToBoard(self, xy, layer):
@@ -268,29 +334,37 @@ class GameState(): # TODO: Condense inputs
 	def _nextPlayer(self):
 		return (self.playerTurnInternal  + 1) % self.num_players
 
+	def _bodyLayer(self):
+		return (self.playerTurnInternal * 2)
+
+	def _headLayer(self):
+		return self._bodyLayer() + 1
+
 
 	def takeAction(self, action):
 
 
-		print(self._get_current_location)
-		print(action)
 		new_xy = self._get_action_xy(self.possibleActions[action])
 
 		snake = copy.deepcopy(self.snakes[self.playerTurnInternal])
 
 		newBoard = np.array(self.board)
-		print(new_xy)
 
 		hasFood = self._hasFood(new_xy)
+
 		newBoard[self._xyToBoard(new_xy, self.food_layer)] = 0
 
 		# Remove tail if at least 3 long
 		if len(snake) >= 3 and not hasFood:
-			newBoard[ self._xyToBoard(snake[-1], self.playerTurnInternal) ] = 0
+			newBoard[ self._xyToBoard(snake[-1], self._bodyLayer()) ] = 0
 			snake = snake[:-1]
 
-		# Add head
-		newBoard[self._xyToBoard(new_xy, self.playerTurnInternal)] = 1
+		# Move old head to body layer
+		newBoard[self._xyToBoard(snake[0], self._bodyLayer())] = 1
+		newBoard[self._xyToBoard(snake[0], self._headLayer())] = 0
+
+		# Move new head to head layer
+		newBoard[self._xyToBoard(new_xy, self._headLayer())] = 1
 		snake = [new_xy] + snake
 
 		snakes = copy.deepcopy(self.snakes)
@@ -308,9 +382,8 @@ class GameState(): # TODO: Condense inputs
 			health[self.playerTurnInternal] = MAX_HEALTH
 
 
-
-
 		newState = GameState(newBoard, self.grid_shape, snakes, self._nextPlayer(), turnNumber, health)
+
 
 		value = 0
 		done = 0
@@ -323,29 +396,60 @@ class GameState(): # TODO: Condense inputs
 
 
 
+	def _print_render(self):
 
-	def render(self, logger):
-
-		print()
 		snakes_bodies = [ snake_xy for snake in self.snakes for snake_xy in snake ]
-		print(snakes_bodies)
+		snakes_heads = [ snake[0] for snake in self.snakes ]
+
 		xys = ((x,y) for x in range(self.w) for y in range(self.h))
-		print(''.join(['-'] * self.w))
 		for x in range(self.w):
 			pieces = []
 			for y in range(self.h):
 				piece = ' '
-				if self._hasFood((x,y)):
-					piece = '#'
-				elif (x,y) in snakes_bodies:
+				if (x,y) in snakes_heads:
 					piece = 'O'
+				elif self._hasFood((x,y)):
+					piece = '*'
+				elif (x,y) in snakes_bodies:
+					piece = 'o'
 
 				pieces.append(piece)
 			print(''.join(pieces))
 		print(''.join(['-'] * self.w))
 
-		print(self.snakes)
-		print(self.turnNumber)
-		print(self.health)
+		print("Turn Numbers: %s" % str(self.turnNumber))
+		print("Healths: %s" % str(self.health))
+		print("Possible Actions: %s" % str(self._allowedActions()))
+		print("Current Turn: %s" % str(self.playerTurnInternal))
+		print("Current Lengths: %s" % str([len(snake) for snake in self.snakes] ))
 
 		print('--------------')
+
+	def render(self, logger):
+
+		snakes_bodies = [ snake_xy for snake in self.snakes for snake_xy in snake ]
+		snakes_heads = [ snake[0] for snake in self.snakes ]
+
+		xys = ((x,y) for x in range(self.w) for y in range(self.h))
+		for x in range(self.w):
+			pieces = []
+			for y in range(self.h):
+				piece = ' '
+				if (x,y) in snakes_heads:
+					piece = 'O'
+				elif self._hasFood((x,y)):
+					piece = '*'
+				elif (x,y) in snakes_bodies:
+					piece = 'o'
+
+				pieces.append(piece)
+			logger.info(''.join(pieces))
+		logger.info(''.join(['-'] * self.w))
+
+		logger.info("Turn Numbers: %s" % str(self.turnNumber))
+		logger.info("Healths: %s" % str(self.health))
+		logger.info("Possible Actions: %s" % str(self._allowedActions()))
+		logger.info("Current Turn: %s" % str(self.playerTurnInternal))
+		logger.info("Current Lengths: %s" % str([len(snake) for snake in self.snakes] ))
+
+		logger.info('--------------')

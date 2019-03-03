@@ -23,6 +23,7 @@ class User():
 		self.action_size = action_size
 
 	def act(self, state, tau):
+		state.render(lg.logger_main)
 		action = int(input('Enter your chosen action: '))
 		pi = np.zeros(self.action_size)
 		pi[action] = 1
