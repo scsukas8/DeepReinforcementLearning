@@ -7,18 +7,18 @@ import time
 
 from api import ping_response, start_response, move_response, end_response
 
-import os,sys,inspect
-currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
-parentdir = os.path.dirname(currentdir)
-sys.path.insert(0,parentdir)
+#import os,sys,inspect
+#currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
+#parentdir = os.path.dirname(currentdir)
+#sys.path.insert(0,parentdir)
 
-from alpha_snake import Battlesnake
+#from alpha_snake import Battlesnake
 
 
 class App():
 
     def __init__(self):
-        self.battlesnake = Battlesnake()
+        #self.battlesnake = Battlesnake()
 
     def run(self):
         bottle.run(
@@ -61,9 +61,9 @@ class App():
         """
         print(json.dumps(data))
         
-        self.battlesnake.start(data)
+        #self.battlesnake.start(data)
         print("Snek Started")
-        action, _, _, _ =  self.battlesnake.act(data)
+        #action, _, _, _ =  self.battlesnake.act(data)
 
 
         color = "#342D7E"
@@ -82,9 +82,9 @@ class App():
 
         directions = ['up', 'down', 'left', 'right']
 
-        action, _, _, _ =  self.battlesnake.act(data)
+        #action, _, _, _ =  self.battlesnake.act(data)
 
-        direction = directions[action]
+        direction = directions[0]#action]
         print(direction)
 
         return move_response(direction)
