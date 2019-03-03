@@ -7,6 +7,11 @@ import time
 
 from api import ping_response, start_response, move_response, end_response
 
+import os,sys,inspect
+currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
+parentdir = os.path.dirname(currentdir)
+sys.path.insert(0,parentdir)
+
 from alpha_snake import Battlesnake
 
 
